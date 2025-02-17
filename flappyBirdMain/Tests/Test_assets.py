@@ -3,22 +3,25 @@ import pygame
 import sys
 import os
 
-# Adiciona o diretório raiz ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Define o caminho correto para os módulos
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
+sys.path.append(parent_dir)
 
-# Agora o Python consegue encontrar o módulo assets
 import assets
 
 class TestAssets(unittest.TestCase):
-    def test_load_sprites(self):
+    def setUp(self):
         assets.load_sprites()
-        self.assertIn("bird", assets.sprites)
-        self.assertIsInstance(assets.sprites["bird"], pygame.Surface)
+        assets.load_audios()
+
+    def test_load_sprites(self):
+        self.assertIn("bird", assets.sprites, "Sprite 'bird' não encontrado")
+        self.assertIsInstance(assets.sprites["bird"], pygame.Surface, "Objeto 'bird' não é uma Surface")
 
     def test_load_audios(self):
-        assets.load_audios()
-        self.assertIn("hit", assets.audios)
-        self.assertIsInstance(assets.audios["hit"], pygame.mixer.Sound)
+        self.assertIn("hit", assets.audios, "Áudio 'hit' não encontrado")
+        self.assertIsInstance(assets.audios["hit"], pygame.mixer.Sound, "Objeto 'hit' não é um Sound")
 
 if __name__ == "__main__":
     unittest.main()
