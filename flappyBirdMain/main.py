@@ -13,32 +13,108 @@ from objects.gameover_message import GameOverMessage
 from objects.gamestart_message import GameStartMessage
 from objects.score import Score
 
+import re
+
+def carregar_usuarios():
+    """Carrega os usuários do arquivo e retorna um dicionário {nome: senha}"""
+    cadastro = "cadastro.txt"
+    usuarios = {}
+
+    if os.path.exists(cadastro):
+        with open(cadastro, "r") as f:
+            for linha in f:
+                linha = linha.strip()
+                if linha:
+                    partes = linha.split(",")
+                    if len(partes) == 2:
+                        nome, senha = partes
+                        usuarios[nome] = senha
+    return usuarios
+
+def salvar_usuario(nome, senha):
+    """Salva um novo usuário no arquivo"""
+    with open("cadastro.txt", "a") as f:
+        f.write(f"{nome},{senha}\n")
+
+def cadastro():
+    while True:
+        usuarios = carregar_usuarios()
+
+        nome = input("Digite seu nome (apenas letras): ").strip()
+        if not nome.isalpha():
+            print("Nome inválido! Use apenas letras.")
+            continue
+        if nome in usuarios:
+            print("Este nome de usuário já existe! Tente outro.")
+            continue
+
+        senha = input("Digite sua senha (mínimo 3 números): ").strip()
+        if not senha.isdigit() or len(senha) < 3:
+            print("Senha inválida! Use apenas números e no mínimo 3 dígitos.")
+            continue
+
+        salvar_usuario(nome, senha)
+        print("Cadastro realizado com sucesso!")
+
+        while True:
+            deseja_login = input("Deseja fazer login agora? [S/N]: ").strip().upper()
+            if deseja_login == "S":
+                login()
+                return
+            elif deseja_login == "N":
+                return
+            else:
+                print("Opção inválida! Digite 'S' para sim ou 'N' para não.")
+
+def login():
+    usuarios = carregar_usuarios()
+
+    if not usuarios:
+        print("Nenhum usuário cadastrado. Por favor, faça o cadastro primeiro.")
+        return
+
+    while True:
+        nome = input("Digite seu nome: ").strip()
+        if nome in usuarios:
+            senha = input("Digite sua senha: ").strip()
+            if senha == usuarios[nome]:
+                print("Login realizado com sucesso!")
+                return
+            else:
+                print("Senha incorreta! Tente novamente.")
+        else:
+            print("Nome de usuário incorreto! Tente novamente.")
+
+while True:
+    entrando = input("Deseja Cadastrar? [S/N] ").strip().upper()
+    if entrando == "S":
+        cadastro()
+        break
+    elif entrando == "N":
+        login()
+        break
+    else:
+        print("Entrada inválida! Digite 'S' para sim ou 'N' para não.")
+
 pygame.init()
 
-# Configuração da tela do jogo
 screen = pygame.display.set_mode((configs.SCREEN_WIDTH, configs.SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird Game v1.0.2")
 
-# Configuração do ícone
 base_path = os.path.dirname(os.path.abspath(__file__))
 icon_path = os.path.join(base_path, 'assets', 'icons', 'red_bird.png')
 img = pygame.image.load(icon_path)
 pygame.display.set_icon(img)
 
-# Carregar assets
 assets.load_sprites()
 assets.load_audios()
 
-# Configurações do jogo
 clock = pygame.time.Clock()
-column_create_event = pygame.USEREVENT + 1  # 🔥 Corrigido para evitar conflito com outros eventos
+column_create_event = pygame.USEREVENT + 1
 running = True
 gameover = False
 gamestarted = False
-logged_in = False
-current_user = None
 
-# Criando sprites
 sprites = pygame.sprite.LayeredUpdates()
 
 def create_sprites():
@@ -50,30 +126,16 @@ def create_sprites():
 
 bird, game_start_message, score = create_sprites()
 
-# Função assíncrona para enviar mensagens ao WebSocket
-async def send_message(message):
-    async with websockets.connect("ws://localhost:8765") as websocket:
-        await websocket.send(message)
-        response = await websocket.recv()
-        print(response)
-        return response
+def display_message(text):
+    font = pygame.font.Font(None, 15)
+    text_surface = font.render(text, True, (255, 255, 255), (0, 0, 0))
+    text_rect = text_surface.get_rect(center=(configs.SCREEN_WIDTH//2, configs.SCREEN_HEIGHT//3))
+    screen.blit(text_surface, text_rect)
+    pygame.display.flip()
+    pygame.time.delay(2000)
 
-# Registro e login do usuário
-async def register(username, password):
-    response = await send_message(f"register:{username}:{password}")
-    return "register_success" in response
-
-async def login(username, password):
-    response = await send_message(f"login:{username}:{password}")
-    return "login_success" in response
-
-async def logout():
-    response = await send_message("logout:")
-    return "logout_success" in response
-
-# Loop de Jogo
 def game_loop():
-    global running, gameover, gamestarted, logged_in, current_user
+    global running, gameover, gamestarted
     global bird, game_start_message, score
 
     while running:
@@ -81,45 +143,41 @@ def game_loop():
             if event.type == pygame.QUIT:
                 running = False
 
-            # O usuário pode pressionar espaço para iniciar o jogo
             if event.type == pygame.KEYDOWN:
-                print(f"Tecla pressionada: {event.key}")  # Depuração
-
                 if event.key == pygame.K_SPACE:
                     if not gamestarted and not gameover:
                         gamestarted = True
                         game_start_message.kill()
-                        pygame.time.set_timer(column_create_event, 1500)  # 🔥 Agora os canos serão criados corretamente
-                        print("Jogo iniciado! Canos serão gerados.")
-
-                    bird.handle_event(event)  # 🔥 Pássaro pula corretamente
+                        pygame.time.set_timer(column_create_event, 1500)
+                    bird.handle_event(event)
 
                 if event.key == pygame.K_ESCAPE and gameover:
-                    gameover = False
-                    gamestarted = False
-                    sprites.empty()
-                    bird, game_start_message, score = create_sprites()
+                    display_message("VOCÊ PERDEU! JOGAR NOVAMENTE? [S/N]")
+                    waiting_for_response = True
+                    while waiting_for_response:
+                        for event in pygame.event.get():
+                            if event.type == pygame.KEYDOWN:
+                                if event.key == pygame.K_s:
+                                    gameover = False
+                                    gamestarted = False
+                                    sprites.empty()
+                                    bird, game_start_message, score = create_sprites()
+                                    waiting_for_response = False
+                                elif event.key == pygame.K_n:
+                                    display_message("ENCERRANDO O JOGO...")
+                                    running = False
+                                    pygame.quit()
+                                    sys.exit()
 
-                if event.key == pygame.K_o and logged_in:  
-                    asyncio.run(logout())
-                    logged_in = False
-                    current_user = None
-                    print("Logout bem-sucedido!")
-
-            # Criando canos no jogo
             if event.type == column_create_event:
-                print("Criando um novo cano!")  # Depuração
-                Column(sprites)  # 🔥 Canos agora aparecem corretamente
+                Column(sprites)
 
-        # Atualiza o jogo
         screen.fill(0)
         sprites.draw(screen)
 
         if gamestarted and not gameover:
-            print("Jogo rodando...")  # Depuração
             sprites.update()
 
-        # Verifica colisões
         if bird.check_collision(sprites) and not gameover:
             gameover = True
             gamestarted = False
@@ -127,7 +185,6 @@ def game_loop():
             pygame.time.set_timer(column_create_event, 0)
             assets.play_audio("hit")
 
-        # Atualiza pontuação
         for sprite in sprites:
             if isinstance(sprite, Column) and sprite.is_passed():
                 score.value += 1
@@ -138,6 +195,5 @@ def game_loop():
 
     pygame.quit()
 
-# ✅ Rodando o jogo separadamente do WebSocket
 if __name__ == "__main__":
     game_loop()
