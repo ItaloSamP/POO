@@ -13,8 +13,6 @@ from objects.gameover_message import GameOverMessage
 from objects.gamestart_message import GameStartMessage
 from objects.score import Score
 
-import re
-
 def carregar_usuarios():
     """Carrega os usuários do arquivo e retorna um dicionário {nome: senha}"""
     cadastro = "cadastro.txt"
@@ -91,8 +89,15 @@ while True:
         cadastro()
         break
     elif entrando == "N":
-        login()
-        break
+        deseja_logar = input("Deseja fazer login? [S/N] ").strip().upper()
+        if deseja_logar == "S":
+            login()
+            break
+        elif deseja_logar == "N":
+            print("Encerrando o programa...")
+            sys.exit()
+        else:
+            print("Entrada inválida! Digite 'S' para sim ou 'N' para não.")
     else:
         print("Entrada inválida! Digite 'S' para sim ou 'N' para não.")
 
@@ -150,7 +155,6 @@ def game_loop():
                         game_start_message.kill()
                         pygame.time.set_timer(column_create_event, 1500)
                     bird.handle_event(event)
-
                 if event.key == pygame.K_ESCAPE and gameover:
                     display_message("VOCÊ PERDEU! JOGAR NOVAMENTE? [S/N]")
                     waiting_for_response = True
