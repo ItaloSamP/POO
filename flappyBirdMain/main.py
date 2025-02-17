@@ -13,6 +13,51 @@ from objects.gameover_message import GameOverMessage
 from objects.gamestart_message import GameStartMessage
 from objects.score import Score
 
+def cadastro():
+    cadastro = "/content/cadastro.txt"
+    with open(cadastro, "a") as f:
+        nome = input("Digite seu nome: ")
+        senha = input("Digite sua senha: ")
+        # Escreve o nome e a senha no arquivo, separados por vírgula
+        f.write(f"{nome},{senha}\n")
+        f.close()
+        print("Cadastro realizado com sucesso!")
+        print("Agora você pode fazer login!")
+        login()
+
+def login():
+    cadastro = "/content/cadastro.txt"
+    # Ler o arquivo e criar um dicionário com nomes e senhas
+    usuarios = {}
+    try:
+        with open(cadastro, "r") as f:
+            for linha in f:
+                # Remove o \n e divide a linha em nome e senha
+                nome, senha = linha.strip().split(",")
+                usuarios[nome] = senha
+    except FileNotFoundError:
+        print("Nenhum usuário cadastrado. Por favor, faça o cadastro primeiro.")
+        return
+
+    while True:
+        nome = input("Digite seu nome: ")
+        if nome in usuarios:
+            senha = input("Digite sua senha: ")
+            if senha == usuarios[nome]:
+                print("Login realizado com sucesso!")
+                break
+            else:
+                print("Senha incorreta! Tente novamente.")
+        else:
+            print("Nome de usuário incorreto! Tente novamente.")
+
+# Pergunta ao usuário se é novo
+entrando = input("Usuário novo? [S/N]").upper()
+if entrando == "S":
+    cadastro()
+else:
+    login()
+
 pygame.init()
 
 # Configuração da tela do jogo
